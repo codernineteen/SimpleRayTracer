@@ -1,64 +1,73 @@
 #include "Vec3.h"
 #include "Color.h"
 #include "Ray.h"
+#include "Sphere.h"
 #include <iostream>
 #include <fstream>
 
-bool hitSphere(const Point3& p, double radius, const Ray& r) {
-	Vec3 oc = r.origin() - p;
-	auto a = dot(r.direction(), r.direction());
-	auto b = 2.0 * dot(r.direction(), oc);
-	auto c = dot(oc, oc) - radius * radius;
-	auto discriminant = b * b - 4 * a * c;
-	return (discriminant >= 0);
+HitRecord rec;
+Sphere s1(Point3(0, 0, -1), 0.5);
+
+Color3 ray_color(const Ray& r) {
+    s1.hit(r, 0, 1000, rec);
+    if (rec.t > 0.0) {
+        Vec3 N = rec.normal;
+        return 0.5 * Color3(N.x() + 1, N.y() + 1, N.z() + 1);
+
+    }
+
+    Vec3 unit_direction = unit_vector(r.direction());
+    auto a = 0.5 * (unit_direction.y() + 1.0);
+    return (1.0 - a) * Color3(1.0, 1.0, 1.0) + a * Color3(0.5, 0.7, 1.0);
 }
 
-Color3 rayColor(const Ray& r) {
-	if (hitSphere(Point3(0, 0, -1), 0.5, r))
-		return Color3(1, 0, 0);
-
-	Vec3 unitDirection = unit_vector(r.direction());
-	auto a = 0.5 * (unitDirection.y() + 1.0); // map y from [-1, 1] to [0, 1]
-	return (1.0 - a) * Color3(1.0, 1.0, 1.0) + a * Color3(0.5, 0.7, 1.0); // linear interpolation
-}
 
 int main() {
-	auto aspectRatio = 16.0 / 9.0;
-	int imageWidth = 400;
-	int imageHeight = static_cast<int>(imageWidth / aspectRatio);
-	imageHeight = (imageHeight < 1) ? 1 : imageHeight;
 
-	// camera
-	auto focalLength = 1.0;
-	auto viewportHeight = 2.0;
-	auto viewportWidth = viewportHeight * (static_cast<double>(imageWidth) / imageHeight);
-	auto cameraOrigin = Point3(0, 0, 0);
+    // Image
 
-	// viewport edge vectors
-	auto viewportUVec = Vec3(viewportWidth, 0, 0);
-	auto viewportVVec = Vec3(0, -viewportHeight, 0);
-	// pixel delta between two pixels
-	auto pixelUVec = viewportUVec / imageWidth;
-	auto pixelVVec = viewportVVec / imageHeight;
-	// location of upper left pixel
-	auto viewportUpperLeft = cameraOrigin - Vec3(0, 0, focalLength) - viewportUVec/2 + viewportVVec/2;
-	auto pixelOrigin = viewportUpperLeft + 0.5 * (pixelUVec + pixelVVec);
+    auto aspect_ratio = 16.0 / 9.0;
+    int image_width = 400;
 
+    // Calculate the image height, and ensure that it's at least 1.
+    int image_height = static_cast<int>(image_width / aspect_ratio);
+    image_height = (image_height < 1) ? 1 : image_height;
 
-	std::ofstream outputFile("output.ppm");
-	outputFile << "P3\n" << imageWidth << " " << imageHeight << "\n255\n";
+    // Camera
 
-	for (int j = 0; j < imageHeight; ++j) {
-		std::clog << "\rScanlines remaining: " << (imageHeight - j) << ' ' << std::flush;
-		for (int i = 0; i < imageWidth; ++i) {
-			auto pixel_center = pixelOrigin + (i * pixelUVec) + (j * pixelVVec);
-			auto ray_direction = pixel_center - cameraOrigin;
-			Ray r(cameraOrigin, ray_direction);
+    auto focal_length = 1.0;
+    auto viewport_height = 2.0;
+    auto viewport_width = viewport_height * (static_cast<double>(image_width) / image_height);
+    auto camera_center = Point3(0, 0, 0);
 
-			Color3 pixel_color = rayColor(r);
-			write_color(outputFile, pixel_color);
-		}
-	}
+    // Calculate the vectors across the horizontal and down the vertical viewport edges.
+    auto viewport_u = Vec3(viewport_width, 0, 0);
+    auto viewport_v = Vec3(0, -viewport_height, 0);
 
-	std::clog << "\rGenerated an image.                \n";
+    // Calculate the horizontal and vertical delta vectors from pixel to pixel.
+    auto pixel_delta_u = viewport_u / image_width;
+    auto pixel_delta_v = viewport_v / image_height;
+
+    // Calculate the location of the upper left pixel.
+    auto viewport_upper_left = camera_center
+        - Vec3(0, 0, focal_length) - viewport_u / 2 - viewport_v / 2;
+    auto pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+
+    // Render
+    std::ofstream outputFile("output.ppm");
+    outputFile << "P3\n" << image_width << " " << image_height << "\n255\n";
+
+    for (int j = 0; j < image_height; ++j) {
+        std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+        for (int i = 0; i < image_width; ++i) {
+            auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
+            auto ray_direction = pixel_center - camera_center;
+            Ray r(camera_center, ray_direction);
+
+            Color3 pixel_color = ray_color(r);
+            write_color(outputFile, pixel_color);
+        }
+    }
+
+    std::clog << "\rDone.                 \n";
 }
