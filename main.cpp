@@ -1,73 +1,77 @@
-#include "Vec3.h"
+#include "utilities.h"
+
 #include "Color.h"
-#include "Ray.h"
+#include "Hittable.h"
+#include "HittableList.h"
 #include "Sphere.h"
+#include "Camera.h"
+#include "Material.h"
+
 #include <iostream>
 #include <fstream>
 
-HitRecord rec;
-Sphere s1(Point3(0, 0, -1), 0.5);
-
-Color3 ray_color(const Ray& r) {
-    s1.hit(r, 0, 1000, rec);
-    if (rec.t > 0.0) {
-        Vec3 N = rec.normal;
-        return 0.5 * Color3(N.x() + 1, N.y() + 1, N.z() + 1);
-
-    }
-
-    Vec3 unit_direction = unit_vector(r.direction());
-    auto a = 0.5 * (unit_direction.y() + 1.0);
-    return (1.0 - a) * Color3(1.0, 1.0, 1.0) + a * Color3(0.5, 0.7, 1.0);
-}
-
-
 int main() {
+    // World
+    HittableList world;
 
-    // Image
+    auto ground_material = make_shared<LambertianMaterial>(Color3(0.5, 0.5, 0.5));
+    world.add(make_shared<Sphere>(Point3(0, -1000, 0), 1000, ground_material));
 
-    auto aspect_ratio = 16.0 / 9.0;
-    int image_width = 400;
+    for (int a = -11; a < 11; a++) {
+        for (int b = -11; b < 11; b++) {
+            auto choose_mat = random_double();
+            Point3 center(a + 0.9 * random_double(), 0.2, b + 0.9 * random_double());
 
-    // Calculate the image height, and ensure that it's at least 1.
-    int image_height = static_cast<int>(image_width / aspect_ratio);
-    image_height = (image_height < 1) ? 1 : image_height;
+            if ((center - Point3(4, 0.2, 0)).length() > 0.9) {
+                shared_ptr<Material> sphere_material;
 
-    // Camera
-
-    auto focal_length = 1.0;
-    auto viewport_height = 2.0;
-    auto viewport_width = viewport_height * (static_cast<double>(image_width) / image_height);
-    auto camera_center = Point3(0, 0, 0);
-
-    // Calculate the vectors across the horizontal and down the vertical viewport edges.
-    auto viewport_u = Vec3(viewport_width, 0, 0);
-    auto viewport_v = Vec3(0, -viewport_height, 0);
-
-    // Calculate the horizontal and vertical delta vectors from pixel to pixel.
-    auto pixel_delta_u = viewport_u / image_width;
-    auto pixel_delta_v = viewport_v / image_height;
-
-    // Calculate the location of the upper left pixel.
-    auto viewport_upper_left = camera_center
-        - Vec3(0, 0, focal_length) - viewport_u / 2 - viewport_v / 2;
-    auto pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
-
-    // Render
-    std::ofstream outputFile("output.ppm");
-    outputFile << "P3\n" << image_width << " " << image_height << "\n255\n";
-
-    for (int j = 0; j < image_height; ++j) {
-        std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
-        for (int i = 0; i < image_width; ++i) {
-            auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
-            auto ray_direction = pixel_center - camera_center;
-            Ray r(camera_center, ray_direction);
-
-            Color3 pixel_color = ray_color(r);
-            write_color(outputFile, pixel_color);
+                if (choose_mat < 0.8) {
+                    // diffuse
+                    auto albedo = Color3::random() * Color3::random();
+                    sphere_material = make_shared<LambertianMaterial>(albedo);
+                    world.add(make_shared<Sphere>(center, 0.2, sphere_material));
+                }
+                else if (choose_mat < 0.95) {
+                    // metal
+                    auto albedo = Color3 ::random(0.5, 1);
+                    auto fuzz = random_double(0, 0.5);
+                    sphere_material = make_shared<MetalMaterial>(albedo, fuzz);
+                    world.add(make_shared<Sphere>(center, 0.2, sphere_material));
+                }
+                else {
+                    // glass
+                    sphere_material = make_shared<DielectricMaterial>(1.5);
+                    world.add(make_shared<Sphere>(center, 0.2, sphere_material));
+                }
+            }
         }
     }
 
-    std::clog << "\rDone.                 \n";
+    auto material1 = make_shared<DielectricMaterial>(1.5);
+    world.add(make_shared<Sphere>(Point3(0, 1, 0), 1.0, material1));
+
+    auto material2 = make_shared<LambertianMaterial>(Color3(0.4, 0.2, 0.1));
+    world.add(make_shared<Sphere>(Point3(-4, 1, 0), 1.0, material2));
+
+    auto material3 = make_shared<MetalMaterial>(Color3(0.7, 0.6, 0.5), 0.0);
+    world.add(make_shared<Sphere>(Point3(4, 1, 0), 1.0, material3));
+
+    // Camera
+    Camera cam;
+    
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 400;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+
+    cam.fov = 20;
+    cam.lookfrom = Point3(13, 2, 3);
+    cam.lookat = Point3(0, 0, 0);
+    cam.vup = Vec3(0, 1, 0);
+
+    cam.defocus_angle = 0.6;
+    cam.focus_dist = 10.0;
+
+    // Render
+    cam.render(world);
 }

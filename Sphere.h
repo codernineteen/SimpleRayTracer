@@ -4,9 +4,9 @@
 class Sphere : public Hittable
 {
 public:
-    Sphere(Point3 _center, double _radius) : center(_center), radius(_radius) {}
+    Sphere(Point3 _center, double _radius, shared_ptr<Material> _material) : center(_center), radius(_radius), mat(_material) {}
 
-    bool hit(const Ray& r, double ray_tmin, double ray_tmax, HitRecord& rec) const override {
+    bool hit(const Ray& r, Interval ray_t, HitRecord& rec) const override {
         Vec3 oc = r.origin() - center;
         auto a = r.direction().length_squared();
         auto half_b = dot(oc, r.direction());
@@ -18,15 +18,19 @@ public:
 
         // Find the nearest root that lies in the acceptable range.
         auto root = (-half_b - sqrtd) / a;
-        if (root <= ray_tmin || ray_tmax <= root) {
+        if (!ray_t.surrounds(root)) {
             root = (-half_b + sqrtd) / a;
-            if (root <= ray_tmin || ray_tmax <= root)
+            if (!ray_t.surrounds(root))
                 return false;
         }
 
         rec.t = root;
         rec.p = r.at(rec.t);
-        rec.normal = (rec.p - center) / radius;
+        Vec3 outward_normal = (rec.p - center) / radius;
+        // if front face , outward_normal itself
+        // otherwise, -outward_normal
+        rec.set_face_normal(r, outward_normal);
+        rec.mat = mat; // record material into hit record
 
         return true;
     }
@@ -34,5 +38,6 @@ public:
 private:
     Point3 center;
     double radius;
+    shared_ptr<Material> mat;
 };
 
