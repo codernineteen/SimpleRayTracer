@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Hittable.h"
+#include "AABB.h"
 
 #include <vector>
 #include <memory>
@@ -18,7 +19,10 @@ public:
 	HittableList(std::shared_ptr<Hittable> object) { add(object); }
 
 	void clear() { objects.clear(); }
-	void add(std::shared_ptr<Hittable> object) { objects.push_back(object); }
+	void add(std::shared_ptr<Hittable> object) { 
+		objects.push_back(object); 
+		bbox = AABB(bbox, object->bounding_box()); // expand box whenever there is a new object
+	}
 
 	bool hit(const Ray& r, Interval ray_t, HitRecord& rec) const override {
 		HitRecord temp_rec;
@@ -36,5 +40,11 @@ public:
 
 		return hit_anything;
 	}
+
+	// bounding box getter
+	AABB bounding_box() const override { return bbox; }
+
+private:
+	AABB bbox;
 };
 
