@@ -3,6 +3,7 @@
 #include "utilities.h"
 
 #include "HittableList.h"
+#include "Texture.h"
 #include "Color.h"
 
 class Material 
@@ -15,7 +16,8 @@ public:
 class LambertianMaterial : public Material
 {
 public:
-	LambertianMaterial(const Color3& a) : albedo(a) {}
+	LambertianMaterial(const Color3& a) : albedo(make_shared<SolidColor>(a)) {}
+	LambertianMaterial(shared_ptr<Texture> a) : albedo(a) {}
 
 	bool scatter(const Ray& r, const HitRecord& rec, Color3& atteunation, Ray& scattered) const override {
 		auto scattered_direction = rec.normal + random_unit_vector();
@@ -23,13 +25,13 @@ public:
 		if(scattered_direction.near_zero()) 			
 			scattered_direction = rec.normal;
 
-		scattered = Ray(rec.p, scattered_direction);
-		atteunation = albedo;
+		scattered = Ray(rec.p, scattered_direction, r.get_time());
+		atteunation = albedo->value(rec.u, rec.v, rec.p);
 		return true;
 	}
 
 private:
-	Color3 albedo;
+	shared_ptr<Texture> albedo;
 };
 
 class MetalMaterial : public Material
@@ -39,7 +41,7 @@ public:
 
 	bool scatter(const Ray& r, const HitRecord& rec, Color3& atteunation, Ray& scattered) const override {
 		auto reflected = reflect(unit_vector(r.direction()), rec.normal);
-		scattered = Ray(rec.p, reflected + fuzz * random_unit_vector());
+		scattered = Ray(rec.p, reflected + fuzz * random_unit_vector(), r.get_time());
 		atteunation = albedo;
 		return (dot(scattered.direction(), rec.normal) > 0);
 	}
@@ -71,7 +73,7 @@ public:
 			direction = refract(unit_direction, rec.normal, refraction_ratio);
 		}
 
-		scattered = Ray(rec.p, direction);
+		scattered = Ray(rec.p, direction, r_in.get_time());
 		return true;
 	}
 
