@@ -6,19 +6,43 @@
 #include "Sphere.h"
 #include "Camera.h"
 #include "Material.h"
+#include "BVH.h"
+#include "Texture.h"
 
 #include <iostream>
 #include <fstream>
 
-int main() {
+void earth() {
+    auto earth_texture = make_shared<ImageTexture>("earthmap.jpg");
+    auto earth_surface = make_shared<LambertianMaterial>(earth_texture);
+    auto globe = make_shared<Sphere>(Point3(0, 0, 0), 2, earth_surface);
+
+    Camera cam;
+
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 400;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+
+    cam.fov = 20;
+    cam.lookfrom = Point3(0, 0, 12);
+    cam.lookat = Point3(0, 0, 0);
+    cam.vup = Vec3(0, 1, 0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(HittableList(globe));
+}
+
+void random_spheres() {
     // World
     HittableList world;
 
     auto ground_material = make_shared<LambertianMaterial>(Color3(0.5, 0.5, 0.5));
     world.add(make_shared<Sphere>(Point3(0, -1000, 0), 1000, ground_material));
 
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
+    for (int a = -3; a < 3; a++) {
+        for (int b = -3; b < 3; b++) {
             auto choose_mat = random_double();
             Point3 center(a + 0.9 * random_double(), 0.2, b + 0.9 * random_double());
 
@@ -28,8 +52,9 @@ int main() {
                 if (choose_mat < 0.8) {
                     // diffuse
                     auto albedo = Color3::random() * Color3::random();
-                    sphere_material = make_shared<LambertianMaterial>(albedo);
-                    world.add(make_shared<Sphere>(center, 0.2, sphere_material));
+                    sphere_material = make_shared<LambertianMaterial>(albedo);  
+                    auto center2 = center + Vec3(0, random_double(0, 0.5), 0);
+                    world.add(make_shared<Sphere>(center, center2, 0.2, sphere_material));
                 }
                 else if (choose_mat < 0.95) {
                     // metal
@@ -56,6 +81,8 @@ int main() {
     auto material3 = make_shared<MetalMaterial>(Color3(0.7, 0.6, 0.5), 0.0);
     world.add(make_shared<Sphere>(Point3(4, 1, 0), 1.0, material3));
 
+
+    world = HittableList(make_shared<BVHNode>(world));
     // Camera
     Camera cam;
     
@@ -74,4 +101,59 @@ int main() {
 
     // Render
     cam.render(world);
+}
+
+void two_spheres() {
+// World
+	HittableList world;
+
+    auto checker = make_shared<CheckerTexture>(0.8, Color3(.2, .3, .1), Color3(.9, .9, .9));
+
+	world.add(make_shared<Sphere>(Point3(0, -10, 0), 10, make_shared<LambertianMaterial>(checker)));
+	world.add(make_shared<Sphere>(Point3(0, 10, 0), 10, make_shared<LambertianMaterial>(checker)));
+
+	// Camera
+	Camera cam;
+	cam.aspect_ratio = 16.0 / 9.0;
+	cam.image_width = 400;
+	cam.samples_per_pixel = 100;
+	cam.max_depth = 50;
+
+	cam.fov = 20;
+	cam.lookfrom = Point3(13, 2, 3);
+	cam.lookat = Point3(0, 0, 0);
+	cam.vup = Vec3(0, 1, 0);
+
+    cam.defocus_angle = 0;
+
+	// Render
+	cam.render(world);
+}
+
+void two_perlin_spheres() {
+    HittableList world;
+
+    auto pertext = make_shared<NoiseTexture>(4);
+    world.add(make_shared<Sphere>(Point3(0, -1000, 0), 1000, make_shared<LambertianMaterial>(pertext)));
+    world.add(make_shared<Sphere>(Point3(0, 2, 0), 2, make_shared<LambertianMaterial>(pertext)));
+
+    Camera cam;
+
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 400;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+
+    cam.fov = 20;
+    cam.lookfrom = Point3(13, 2, 3);
+    cam.lookat = Point3(0, 0, 0);
+    cam.vup = Vec3(0, 1, 0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(world);
+}
+
+int main() {
+    two_perlin_spheres();
 }

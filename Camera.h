@@ -70,7 +70,6 @@ private:
 		auto h = tan(theta / 2); // tangent against half of  fov
 		auto viewport_height = 2 * h * focus_dist;
 		auto viewport_width = viewport_height * (static_cast<double>(image_width) / image_height);
-
 		// calculate orthonormal basis for camera
 		w = unit_vector(lookfrom - lookat);
 		u = unit_vector(cross(vup, w));
@@ -117,8 +116,9 @@ private:
 
 		auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
 		auto ray_direction = pixel_sample - center;
+		auto ray_time = random_double();
 
-		return Ray(center, ray_direction);
+		return Ray(center, ray_direction, ray_time);
 	}
 
 	Point3 defocus_disk_sample() const {
